@@ -1,24 +1,39 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { ScrollView, StyleSheet, Text, View, TouchableOpacity, Pressable, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 // import Icon from 'react-native-vector-icons/Ionicons';
 import { Ionicons } from '@expo/vector-icons';
 // import { ProgressChart } from 'react-native-chart-kit'; // Untuk Progress Bar Anggaran
 
+//redux
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useSelector, useDispatch } from "react-redux";
+// import { AddCategory, EditCategory, DeleteCategory } from '../../store/action/budgetCategoryAction';
+import { store } from "../store/index";
+
 // --- DATA SIMULASI (Ganti dengan data Redux Anda) ---
 const totalBalance = 12500000;
 const monthlyExpense = 4800000;
 
-const budgetData = [
-    { name: 'Makanan', current: 1800000, limit: 2500000, color: '#FF7043' },
-    { name: 'Transportasi', current: 550000, limit: 750000, color: '#4CAF50' },
-    { name: 'Hiburan', current: 900000, limit: 1000000, color: '#29B6F6' },
-];
+// const budgetData = [
+//     { name: 'Makanan', current: 1800000, limit: 2500000, color: '#FF7043' },
+//     { name: 'Transportasi', current: 550000, limit: 750000, color: '#4CAF50' },
+//     { name: 'Hiburan', current: 900000, limit: 1000000, color: '#29B6F6' },
+// ];
 
 // Data untuk ProgressChart (harus dalam format 0.0 sampai 1.0)
-const chartData = {
-    labels: budgetData.map(b => b.name),
-    data: budgetData.map(b => b.current / b.limit),
+// const chartData = {
+//     labels: budgetData.map(b => b.name),
+//     data: budgetData.map(b => b.current / b.limit),
+// };
+
+const clearAll = async () => {
+    try {
+        await AsyncStorage.clear();
+        console.log("✅ Semua data AsyncStorage sudah dihapus");
+    } catch (e) {
+        console.error("Gagal menghapus AsyncStorage:", e);
+    }
 };
 
 const Avatar = ({ initials, size, backgroundColor }) => (
@@ -38,7 +53,7 @@ const Avatar = ({ initials, size, backgroundColor }) => (
     </View>
 )
 
-const BalanceCard = ({ title, amount, iconName, color }) => (
+const BalanceCard = ({ title, amount, iconName, color, dataTrx }) => (
     <View style={[styles.balanceCard, { backgroundColor: color + '10', borderColor: color }]}>
         <Ionicons name={iconName} size={28} color={color} />
         <View>
@@ -53,20 +68,36 @@ const BalanceCard = ({ title, amount, iconName, color }) => (
     </View>
 );
 
-const BudgetProgress = ({ name, current, limit, color }) => {
-    const percentage = Math.round((current / limit) * 100);
+const BudgetProgress = ({ name, categoryId, current, limit, color, amount, transaction }) => {
+
     const remaining = limit - current;
     const progressColor = percentage > 90 ? '#E53935' : color; // Merah jika hampir habis
+    const amountBudget = Number(amount);
+
+
+    //calculate total expenses by category
+    function calculate(categoryId) {
+        const totalSpendByCat = transaction
+            .filter(item => item.categoryId === categoryId)
+            .reduce((sum, item) => sum + item.trxNominal, 0);
+
+        return totalSpendByCat
+
+    }
+
+    const percentage = Math.round((12 / amountBudget) * 100);
+    console.log(percentage)
+
 
     return (
         <View style={styles.budgetItem}>
             <View style={styles.budgetHeader}>
                 <Text style={styles.budgetName}>{name}</Text>
                 <Text style={styles.budgetAmount}>
-                    {totalBalance.toLocaleString('en-US', {
+                    {calculate(categoryId).toLocaleString('en-US', {
                         style: 'currency',
                         currency: 'USD',
-                    })} / {totalBalance.toLocaleString('en-US')}
+                    })} / {amountBudget.toLocaleString('en-US')}
                 </Text>
             </View>
             <View style={styles.progressBarBackground}>
@@ -74,7 +105,7 @@ const BudgetProgress = ({ name, current, limit, color }) => {
                     style={[
                         styles.progressBarFill,
                         {
-                            width: `${Math.min(percentage, 100)}%`, // Batasi di 100% untuk UI
+                            width: `${Math.min(Math.round((calculate(categoryId) / amountBudget) * 100), 100)}%`, // Batasi di 100% untuk UI
                             backgroundColor: progressColor,
                         },
                     ]}
@@ -98,11 +129,39 @@ const BudgetProgress = ({ name, current, limit, color }) => {
 // --- LAYAR UTAMA ---
 
 const DashboardScreen = ({ navigation }) => {
+
+    const [dataTrx, setDataTrx] = useState([])
+
     const navigateToAddTransaction = () => {
         // Navigasi ke layar Tambah Transaksi
-        // navigation.navigate('AddTransaction');
+        navigation.navigate('Add Transaction');
         console.log('Navigate to Add Transaction Screen');
     };
+    const dispatch = useDispatch();
+    // console.log(store.getState());
+    // clearAll()
+    // AsyncStorage.removeItem('budget-category-data');
+    // AsyncStorage.setItem('budget-category-data', JSON.stringify([]));
+
+
+    const budgetData = useSelector((state) => state.budgetCategory.datas);
+    const transactionData = useSelector((state) => state.transaction.datasTrx);
+    // setDataTrx(transactionData)
+    // console.log("budgetData: ", budgetData);
+
+    //calculate total expenses
+    const totalSpent = transactionData
+        .filter(item => item.trxType === "2")
+        .reduce((sum, item) => sum + item.trxNominal, 0);
+    //calculate total income
+    const totalIncome = transactionData
+        .filter(item => item.trxType === "1")
+        .reduce((sum, item) => sum + item.trxNominal, 0);
+
+    const totalBalances = totalIncome - totalSpent
+
+
+
 
     return (
         <SafeAreaView style={styles.container} edges={['top']}>
@@ -121,7 +180,7 @@ const DashboardScreen = ({ navigation }) => {
                 <View style={styles.balanceContainer}>
                     <Text style={styles.balanceLabel}>Your Balance</Text>
                     <Text style={styles.totalBalanceText}>
-                        {totalBalance.toLocaleString('en-US', {
+                        {totalBalances.toLocaleString('en-US', {
                             style: 'currency',
                             currency: 'USD',
                         })}
@@ -132,21 +191,21 @@ const DashboardScreen = ({ navigation }) => {
                 <View style={styles.summaryCards}>
                     <BalanceCard
                         title="Expense this month"
-                        amount={monthlyExpense}
+                        amount={totalSpent}
                         iconName="trending-down-outline"
                         color="#E53935"
                     />
                     <BalanceCard
                         title="Income this month"
-                        amount={7000000}
+                        amount={totalIncome}
                         iconName="trending-up-outline"
                         color="#4CAF50"
                     />
                 </View>
 
-                <Text style={styles.sectionTitle}>Status Anggaran Anda</Text>
-                <View style={styles.chartContainer}>
-                    {/* <ProgressChart
+                {/* <Text style={styles.sectionTitle}>Status Anggaran Anda</Text> */}
+                {/* <View style={styles.chartContainer}> */}
+                {/* <ProgressChart
                         data={chartData}
                         width={350} // Lebar Chart
                         height={200}
@@ -168,11 +227,11 @@ const DashboardScreen = ({ navigation }) => {
                             borderRadius: 16,
                         }}
                     /> */}
-                </View>
+                {/* </View> */}
 
                 <View style={styles.budgetList}>
                     {budgetData.map((b, index) => (
-                        <BudgetProgress key={index} {...b} />
+                        <BudgetProgress key={index} {...b} name={b.categoryName} categoryId={b.categoryId} amount={b.categoryAmount} transaction={transactionData} />
                     ))}
                 </View>
                 {/* Add Transaction */}
@@ -191,7 +250,7 @@ const DashboardScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        // backgroundColor: '#F9FAFB',
+        backgroundColor: '#F9FAFB',
         // backgroundColor: '#cbd0d4ff',
     },
     scrollContent: {
@@ -347,7 +406,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         right: 20,
-        bottom: 20,
+        bottom: 0,
         // backgroundColor: '#007AFF', // Warna Biru Khas iOS/Material
         backgroundColor: 'maroon',
 

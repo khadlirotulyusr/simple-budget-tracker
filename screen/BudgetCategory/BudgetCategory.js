@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
     Pressable,
     StyleSheet,
@@ -18,6 +18,11 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from 'expo-linear-gradient';
+
+//redux
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useSelector, useDispatch } from "react-redux";
+import { AddCategory, EditCategory, deleteCategory } from '../../store/action/budgetCategoryAction';
 
 const Header = ({ visible, setVisible }) => {
     const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -42,34 +47,33 @@ const Header = ({ visible, setVisible }) => {
 }
 
 function sortByAmount(data) {
-    console.log(data.listItem)
-    return data.listItem.sort((a, b) => b.categoryBudget - a.categoryBudget);
+    console.log("DATA SORTING: ", data.sort((a, b) => b.categoryAmount - a.categoryAmount));
+    return data.sort((a, b) => b.categoryAmount - a.categoryAmount);
 }
 
-const handleClickDelete = (item) => {
-    Alert.alert("Delete", `Are you sure you want to delete ${item.categoryName}?`, [
-        { text: "Cancel", style: "cancel" },
-        { text: "Delete", style: "destructive", onPress: () => console.log("Deleted") }
-    ]);
-}
+
 
 const handleClickEdit = (item) => {
-    Alert.alert("Edit", `You clicked edit on ${item.categoryName}`);
+    const updatedCategory = {
+        categoryName: item.categoryName + " (Edited)",
+        categoryAmount: item.categoryAmount + 50,
+    };
+    dispatch(EditCategory(item.categoriId, updatedCategory));
 }
 
 const Card = ({ item,
     handleClickEdit,
-    handleClickDelete }) => {
-    const { categoryName, categoryBudget } = item;
+    handleClickDelete, navigation }) => {
+    const { categoryName, categoryAmount } = item;
     return (
         <View style={styles.card}>
             <View style={{ flex: 1 }}>
                 <Text style={styles.name}>{categoryName}</Text>
-                <Text style={{ fontWeight: 'bold' }}>{'$' + categoryBudget}</Text>
+                <Text style={{ fontWeight: 'bold' }}>{'$' + categoryAmount}</Text>
             </View>
             <View style={styles.actionRow}>
                 <TouchableOpacity style={styles.iconButton}>
-                    <Ionicons name="pencil-outline" size={20} color="#3B82F6" onPress={() => handleClickEdit(item)} />
+                    <Ionicons name="pencil-outline" size={20} color="#3B82F6" onPress={() => navigation.navigate('Edit Category', item)} />
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.iconButton}>
                     <Ionicons name="trash-outline" size={20} color="#EF4444" onPress={() => handleClickDelete(item)} />
@@ -80,17 +84,24 @@ const Card = ({ item,
     )
 }
 
-const renderItem = ({ item }) => (
-    <Pressable>
-        <Card
-            handleClickEdit={handleClickEdit}
-            handleClickDelete={handleClickDelete}
-            item={item}
-        />
-    </Pressable>
-);
+// const renderItem = ({ item, navigation }) => (
+//     <Pressable>
+//         <Card
+//             handleClickEdit={handleClickEdit}
+//             handleClickDelete={handleClickDelete}
+//             item={item}
+//             navigation={navigation}
+//         />
+//     </Pressable>
+// );
 
-const ListCategory = ({ listItem }) => {
+const ListCategory = ({ listItem, navigation, handleClickDelete }) => {
+    // Sort data setiap kali listItem berubah
+    const sortedList = useMemo(() => {
+        if (!listItem) return [];
+        return [...listItem].sort((a, b) => b.categoryAmount - a.categoryAmount);
+    }, [listItem]);
+
     return (
         <>
             <View
@@ -100,10 +111,21 @@ const ListCategory = ({ listItem }) => {
                 style={styles.contentContainer}
             >
                 <FlatList
-                    data={listItem}
-                    renderItem={renderItem}
-                    keyExtractor={(item) => item.id}
+                    data={sortedList}
+                    renderItem={({ item }) => (
+                        <Pressable>
+                            <Card
+                                handleClickEdit={handleClickEdit}
+                                handleClickDelete={handleClickDelete}
+                                item={item}
+                                navigation={navigation} // kirim navigation ke Card
+                            />
+                        </Pressable>
+                    )}
+                    keyExtractor={(item) => item.categoryId}
                     contentContainerStyle={styles.listContainer}
+                    navigation={navigation}
+
                 />
 
             </View>
@@ -112,12 +134,12 @@ const ListCategory = ({ listItem }) => {
     );
 }
 
-const HeadContent = (listItem) => {
+const HeadContent = ({ listItem, navigation }) => {
     return (
         <View style={styles.addContainer}>
 
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', margin: '30 0 30 0' }}>
-                <Pressable onPress={() => Alert.alert("Add Category", "You clicked add category")}>
+                <Pressable onPress={() => navigation.navigate('Add Category')}>
                     <View style={{ alignItems: 'center', paddingLeft: 30 }}>
                         <Ionicons name="add" size={35} color="#3B82F6" />
                         <Text>Add Category</Text>
@@ -140,25 +162,40 @@ const HeadContent = (listItem) => {
 }
 const BudgetCategoryPage = ({ navigation }) => {
     const [visible, setVisible] = useState(false);
+    const [sortedListItem, setSortedListItem] = useState([]);
     const fadeAnim = useRef(new Animated.Value(0)).current;
 
-    const listItem = [
-        { id: '1', categoryName: 'Food', categoryBudget: '200' },
-        { id: '2', categoryName: 'Transport', categoryBudget: '100' },
-        { id: '3', categoryName: 'Entertainment', categoryBudget: '150' },
-        { id: '4', categoryName: 'Utilities', categoryBudget: '250' },
-        { id: '5', categoryName: 'Food', categoryBudget: '200' },
-        { id: '6', categoryName: 'Transport', categoryBudget: '100' },
-        { id: '7', categoryName: 'Entertainment', categoryBudget: '150' },
-        { id: '8', categoryName: 'Utilities', categoryBudget: '250' },
+    const dispatch = useDispatch();
+    // AsyncStorage.removeItem('budget-category-data');
+    const listItem = useSelector((state) => state.budgetCategory.datas);
+    // setSortedListItem(listItem);
+    console.log("LIST ITEM: ", listItem);
 
-        { id: '9', categoryName: 'Food', categoryBudget: '200' },
-        { id: '10', categoryName: 'Transport', categoryBudget: '100' },
-        { id: '11', categoryName: 'Entertainment', categoryBudget: '150' },
-        { id: '12', categoryName: 'Utilities', categoryBudget: '250' },
+    // const listItem = [
+    //     { categoryId: '1', categoryName: 'Food', categoryAmount: '200' },
+    //     { categoryId: '2', categoryName: 'Transport', categoryAmount: '100' },
+    //     { categoryId: '3', categoryName: 'Entertainment', categoryAmount: '150' },
+    //     { categoryId: '4', categoryName: 'Utilities', categoryAmount: '250' },
+    //     { categoryId: '5', categoryName: 'Food', categoryAmount: '200' },
+    //     { categoryId: '6', categoryName: 'Transport', categoryAmount: '100' },
+    //     { categoryId: '7', categoryName: 'Entertainment', categoryAmount: '150' },
+    //     { categoryId: '8', categoryName: 'Utilities', categoryAmount: '250' },
 
-    ];
+    //     { categoryId: '9', categoryName: 'Food', categoryAmount: '200' },
+    //     { categoryId: '10', categoryName: 'Transport', categoryAmount: '100' },
+    //     { categoryId: '11', categoryName: 'Entertainment', categoryAmount: '150' },
+    //     { categoryId: '12', categoryName: 'Utilities', categoryAmount: '250' },
 
+    // ];
+
+    const handleClickDelete = (item) => {
+
+        Alert.alert("Delete", `Are you sure you want to delete ${item.categoryName}?`, [
+            { text: "Cancel", style: "cancel" },
+            { text: "Delete", style: "destructive", onPress: () => dispatch(deleteCategory(item.categoryId)) }
+        ]);
+        // dispatch(DeleteCategory(item.categoryId));
+    }
 
     useEffect(() => {
         if (visible) {
@@ -182,6 +219,8 @@ const BudgetCategoryPage = ({ navigation }) => {
     }, [visible]);
 
 
+
+
     return (
         <SafeAreaView style={styles.container} edges={['top']}>
             <View style={styles.background}>
@@ -191,8 +230,16 @@ const BudgetCategoryPage = ({ navigation }) => {
             </View>
             {/* <View style={styles.cardsContainer}> */}
             <Header visible={visible} setVisible={setVisible} />
-            <HeadContent listItem={listItem} />
-            <ListCategory listItem={listItem} />
+            <HeadContent listItem={listItem} navigation={navigation} />
+
+            {listItem.length !== 0 ? (
+                <ListCategory listItem={listItem} navigation={navigation} handleClickDelete={handleClickDelete} />
+            ) : (
+                <View style={styles.contentContainer}>
+                    <View ><Text style={{ textAlign: 'center' }}>No category found.</Text></View>
+                </View>
+            )}
+
 
             {/* </View> */}
         </SafeAreaView >
@@ -267,8 +314,8 @@ const styles = StyleSheet.create({
     },
 
     listContainer: {
-        paddingHorizontal: 16,
-        paddingBottom: 100,
+        // paddingHorizontal: 16,
+        // paddingBottom: 100,
     },
 
     card: {
