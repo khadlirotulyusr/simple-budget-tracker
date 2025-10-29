@@ -1,19 +1,20 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View, TouchableOpacity, Pressable, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 // import Icon from 'react-native-vector-icons/Ionicons';
 import { Ionicons } from '@expo/vector-icons';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 // import { ProgressChart } from 'react-native-chart-kit'; // Untuk Progress Bar Anggaran
 
 //redux
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSelector, useDispatch } from "react-redux";
 // import { AddCategory, EditCategory, DeleteCategory } from '../../store/action/budgetCategoryAction';
 import { store } from "../store/index";
 
 // --- DATA SIMULASI (Ganti dengan data Redux Anda) ---
 const totalBalance = 12500000;
-const monthlyExpense = 4800000;
 
 // const budgetData = [
 //     { name: 'Makanan', current: 1800000, limit: 2500000, color: '#FF7043' },
@@ -68,14 +69,12 @@ const BalanceCard = ({ title, amount, iconName, color, dataTrx }) => (
     </View>
 );
 
-const BudgetProgress = ({ name, categoryId, current, limit, color, amount, transaction }) => {
+const BudgetProgress = ({ name, categoryId, current, limit, amount, transaction }) => {
 
     const remaining = limit - current;
-    const progressColor = percentage > 90 ? '#E53935' : color; // Merah jika hampir habis
     const amountBudget = Number(amount);
-
-
     //calculate total expenses by category
+
     function calculate(categoryId) {
         const totalSpendByCat = transaction
             .filter(item => item.categoryId === categoryId)
@@ -85,9 +84,8 @@ const BudgetProgress = ({ name, categoryId, current, limit, color, amount, trans
 
     }
 
-    const percentage = Math.round((12 / amountBudget) * 100);
-    console.log(percentage)
-
+    const percentage = Math.round((calculate(categoryId) / amountBudget) * 100);
+    const progressColor = percentage > 90 ? '#E53935' : '#3B82F6'; // Merah jika hampir habis
 
     return (
         <View style={styles.budgetItem}>
@@ -105,13 +103,13 @@ const BudgetProgress = ({ name, categoryId, current, limit, color, amount, trans
                     style={[
                         styles.progressBarFill,
                         {
-                            width: `${Math.min(Math.round((calculate(categoryId) / amountBudget) * 100), 100)}%`, // Batasi di 100% untuk UI
+                            width: `${Math.min(percentage, 100)}%`,
                             backgroundColor: progressColor,
                         },
                     ]}
                 />
             </View>
-            <Text style={styles.budgetRemaining}>
+            {/* <Text style={styles.budgetRemaining}>
                 {remaining >= 0
                     ? `Sisa ${totalBalance.toLocaleString('en-US', {
                         style: 'currency',
@@ -121,7 +119,7 @@ const BudgetProgress = ({ name, categoryId, current, limit, color, amount, trans
                         style: 'currency',
                         currency: 'USD',
                     })}`}
-            </Text>
+            </Text> */}
         </View>
     );
 };
@@ -129,39 +127,35 @@ const BudgetProgress = ({ name, categoryId, current, limit, color, amount, trans
 // --- LAYAR UTAMA ---
 
 const DashboardScreen = ({ navigation }) => {
+    const tabBarHeight = useBottomTabBarHeight();
+    const insets = useSafeAreaInsets();
 
     const [dataTrx, setDataTrx] = useState([])
+    const [dataBudget, setDataBudget] = useState([])
 
     const navigateToAddTransaction = () => {
-        // Navigasi ke layar Tambah Transaksi
         navigation.navigate('Add Transaction');
-        console.log('Navigate to Add Transaction Screen');
     };
-    const dispatch = useDispatch();
-    // console.log(store.getState());
-    // clearAll()
-    // AsyncStorage.removeItem('budget-category-data');
-    // AsyncStorage.setItem('budget-category-data', JSON.stringify([]));
-
 
     const budgetData = useSelector((state) => state.budgetCategory.datas);
     const transactionData = useSelector((state) => state.transaction.datasTrx);
-    // setDataTrx(transactionData)
-    // console.log("budgetData: ", budgetData);
+    useEffect(() => {
+        setDataTrx(transactionData)
+        setDataBudget(budgetData)
+
+    }, [transactionData, budgetData])
+
 
     //calculate total expenses
-    const totalSpent = transactionData
+    const totalSpent = dataTrx
         .filter(item => item.trxType === "2")
         .reduce((sum, item) => sum + item.trxNominal, 0);
     //calculate total income
-    const totalIncome = transactionData
+    const totalIncome = dataTrx
         .filter(item => item.trxType === "1")
         .reduce((sum, item) => sum + item.trxNominal, 0);
 
     const totalBalances = totalIncome - totalSpent
-
-
-
 
     return (
         <SafeAreaView style={styles.container} edges={['top']}>
@@ -230,19 +224,24 @@ const DashboardScreen = ({ navigation }) => {
                 {/* </View> */}
 
                 <View style={styles.budgetList}>
-                    {budgetData.map((b, index) => (
+                    {dataBudget.map((b, index) => (
                         <BudgetProgress key={index} {...b} name={b.categoryName} categoryId={b.categoryId} amount={b.categoryAmount} transaction={transactionData} />
                     ))}
                 </View>
                 {/* Add Transaction */}
-                <TouchableOpacity
-                    style={styles.fab}
-                    onPress={navigateToAddTransaction}
-                >
-                    <Ionicons name="add" size={30} color="#FFFFFF" />
-                </TouchableOpacity>
+                {/* <View > */}
+
+
+                {/* </View> */}
 
             </ScrollView>
+            <TouchableOpacity
+                // style={styles.fab}
+                style={[styles.fab, { bottom: tabBarHeight + 10 },]}
+                onPress={navigateToAddTransaction}
+            >
+                <Ionicons name="add" size={30} color="#FFFFFF" />
+            </TouchableOpacity>
         </SafeAreaView>
     );
 };
@@ -254,7 +253,7 @@ const styles = StyleSheet.create({
         // backgroundColor: '#cbd0d4ff',
     },
     scrollContent: {
-        paddingBottom: 100,
+        paddingBottom: 200,
     },
     background: {
         ...StyleSheet.absoluteFillObject,
@@ -394,6 +393,7 @@ const styles = StyleSheet.create({
     progressBarFill: {
         height: '100%',
         borderRadius: 4,
+
     },
     budgetRemaining: {
         fontSize: 12,

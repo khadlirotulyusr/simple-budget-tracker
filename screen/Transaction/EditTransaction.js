@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigation } from '@react-navigation/native';
 import {
     Pressable,
     StyleSheet,
@@ -22,11 +23,10 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
 //redux
 import { useSelector, useDispatch } from "react-redux";
-import { addTransaction } from '../../store/action/transactionAction';
+import { addTransaction, editTransaction } from '../../store/action/transactionAction';
 
 
 const EditTransactionPage = ({ navigation, route }) => {
-    console.log("row data:", route.params);
     const row = route.params;
 
     const [trxId, setTrxId] = useState(row.trxId || 0);
@@ -49,8 +49,6 @@ const EditTransactionPage = ({ navigation, route }) => {
         { value: '2', label: 'Expense' },
     ]
 
-    console.log(selectedCategory, 'selectedCategory')
-
     //redux
     const dispatch = useDispatch();
 
@@ -63,6 +61,12 @@ const EditTransactionPage = ({ navigation, route }) => {
         }));
         setOptCategory(categories);
     }, []); // Jalankan sekali saat komponen dimount
+    useEffect(() => {
+        if (optCategory.length > 0 && row?.categoryId) {
+            const found = optCategory.find(el => el.value === row.categoryId);
+            setSelectedCategory(found || null);
+        }
+    }, [optCategory, row]);
 
     const handleChangeDate = (event, selectedDate) => {
         setShowPicker(Platform.OS === 'ios');
@@ -74,7 +78,7 @@ const EditTransactionPage = ({ navigation, route }) => {
     const formattedDate = trxDate.toLocaleDateString('en-GB'); // dd/mm/yyyy
 
 
-    const handleAddTransaction = () => {
+    const handleEditTransaction = () => {
         if (selectedTrxType === '1') {
             if (!selectedTrxType || !trxName || !trxNominal) {
                 Alert.alert('Error', 'All fields are required!');
@@ -87,20 +91,20 @@ const EditTransactionPage = ({ navigation, route }) => {
                 return;
             }
         }
-        const newTrx = {
+        const updatedTrx = {
             trxDate: formattedDate,
-            trxId: Date.now().toString(),
+            trxId: trxId,
             trxName: trxName,
             trxType: selectedTrxType || 0,
             trxNominal: parseFloat(trxNominal),
             categoryId: selectedCategory?.value || 0,
         };
 
-        console.log('Transaksi edit:', newTrx);
-        dispatch(addTransaction(newTrx));
-        Alert.alert('Success', 'New transaction successfully edited!');
-        navigation.goBack(); // kembali ke screen sebelumnya
-        // navigation.navigate('History')
+        console.log('Transaksi edit:', updatedTrx);
+        dispatch(editTransaction(updatedTrx));
+        Alert.alert('Success', 'Data successfully edited!');
+        // navigation.goBack(); // kembali ke screen sebelumnya
+        navigation.navigate('MainTabs', { screen: 'History' });
     };
 
     return (
@@ -221,8 +225,8 @@ const EditTransactionPage = ({ navigation, route }) => {
                     />
                 </View>
 
-                <TouchableOpacity style={styles.button} onPress={handleAddTransaction}>
-                    <Text style={styles.buttonText}>Add Transaction</Text>
+                <TouchableOpacity style={styles.button} onPress={handleEditTransaction}>
+                    <Text style={styles.buttonText}>Submit</Text>
                 </TouchableOpacity>
             </View>
 

@@ -18,7 +18,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from "@expo/vector-icons";
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
+import { deleteTransaction } from '../../store/action/transactionAction';
 
 const Header = () => {
     const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -55,7 +56,7 @@ const HighLight = ({ transaction, categories }) => {
         }
     }
 
-    console.log(countCategory)
+    // console.log(countCategory)
     let mostUsedCategory = null;
     let maxCount = 0;
 
@@ -67,7 +68,7 @@ const HighLight = ({ transaction, categories }) => {
     }
     const topSpent = categories.find((el) => el.categoryId === mostUsedCategory).categoryName
 
-    console.log("CategoryID terbanyak:", mostUsedCategory);
+    // console.log("CategoryID terbanyak:", mostUsedCategory);
     return (
         // <View style={styles.highLightContainer}>
         <View
@@ -81,8 +82,8 @@ const HighLight = ({ transaction, categories }) => {
 
                 <Text style={{ fontWeight: 'bold', fontSize: 18 }}>Highlights</Text>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 10 }}>
-                    <View style={styles.highLightContent}>
-                        <Text style={{ paddingBottom: 5, fontWeight: 'bold', fontSize: 16 }}>
+                    <View style={[styles.highLightContent]}>
+                        <Text style={{ paddingBottom: 5, fontWeight: 'bold', fontSize: 16, }}>
                             <Ionicons name="card-outline" size={20} color="black" style={styles.highLightIcon} />
                             Total Spent
                         </Text>
@@ -153,7 +154,7 @@ const renderItem = ({ item }) => {
     );
 };
 
-const ListTransaction = ({ transactions, categories, navigation }) => {
+const ListTransaction = ({ transactions, categories, navigation, handleDelete }) => {
     const cat = categories
     function setCategoryName(item) {
         switch (item) {
@@ -169,18 +170,16 @@ const ListTransaction = ({ transactions, categories, navigation }) => {
     const trxAction = (item) => {
         setSelectedRow(item)
         setShowAction(!showAction)
-        console.log('selectedRow', selectedRow)
     }
 
     const editTrx = (selectedRow) => {
-        console.log('click edit')
         navigation.navigate('Edit Transaction', selectedRow)
-
     }
 
-    const deleteTrx = (row) => {
+    // const deleteTrx = (row) => {
+    //     console.log(row)
 
-    }
+    // }
     return (
         <View style={styles.contentContainer}>
 
@@ -252,7 +251,7 @@ const ListTransaction = ({ transactions, categories, navigation }) => {
                             style={styles.menuItem}
                             onPress={() => {
                                 setShowAction(false);
-                                // onDelete();
+                                handleDelete(selectedRow.trxId)
                             }}
                         >
                             <Ionicons name="trash-outline" size={18} color="#EF4444" />
@@ -266,22 +265,29 @@ const ListTransaction = ({ transactions, categories, navigation }) => {
 }
 
 const TransactionPage = ({ navigation }) => {
-    const transactions = [
-        { id: '1', title: 'Groceries', date: '2025-10-25', amount: -50.25, categoryId: 1, categoryName: 'A', type: 'expense' },
-        { id: '2', title: 'Salary', date: '2025-10-24', amount: 1200.0, categoryId: 2, categoryName: 'A', type: 'income' },
-        { id: '3', title: 'Electric Bill', date: '2025-10-23', amount: -75.5, categoryId: 3, categoryName: 'B', type: 'expense' },
-        { id: '4', title: 'Transport', date: '2025-10-22', amount: -20.0, categoryId: 4, categoryName: 'A', type: 'expense' },
-        { id: '5', title: 'Dinner', date: '2025-10-21', amount: -35.9, categoryId: 5, categoryName: 'C', type: 'expense' },
-    ];
-
     //get data from redux
+    // const [trxList, setTrxList] = useState([])
+    // const [categories, setCategories] = useState([])
+
     const trxList = useSelector((state) => state.transaction.datasTrx)
     const categories = useSelector((state) => state.budgetCategory.datas)
 
-    console.log('trxList', trxList)
+    // useEffect(() => {
+    //     setTrxList(transactions)
+    //     setCategories(category)
+
+    // }, [transactions, category])
+
+    useEffect(() => {
+        console.log('trxList updated:', trxList)
+    }, [trxList])
+
+    const dispatch = useDispatch();
+    const handleDelete = (row) => {
+        console.log(row, 'row delete')
+        dispatch(deleteTransaction(row))
+    }
     return (
-
-
         <SafeAreaView style={styles.container} edges={['top']}>
             {/* <ScrollView contentContainerStyle={styles.scrollContent}> */}
             <View style={styles.background}>
@@ -291,7 +297,7 @@ const TransactionPage = ({ navigation }) => {
             </View>
             <Header />
             <HighLight transaction={trxList} categories={categories} />
-            <ListTransaction transactions={trxList} categories={categories} navigation={navigation} />
+            <ListTransaction transactions={trxList} categories={categories} navigation={navigation} handleDelete={handleDelete} />
 
             {/* </ScrollView> */}
 
@@ -333,7 +339,7 @@ const styles = StyleSheet.create({
     },
     highLightContainer: {
         paddingHorizontal: 20,
-        paddingVertical: 30,
+        paddingVertical: 20,
         marginHorizontal: 15,
         marginTop: 10,
         backgroundColor: '#FFFFFF',

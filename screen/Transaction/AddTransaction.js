@@ -89,8 +89,8 @@ const AddTransactionPage = ({ navigation }) => {
         console.log('Transaksi baru:', newTrx);
         dispatch(addTransaction(newTrx));
         Alert.alert('Success', 'New transaction successfully added!');
-        navigation.goBack(); // kembali ke screen sebelumnya
-        // navigation.navigate('History')
+        // navigation.goBack(); // kembali ke screen sebelumnya
+        navigation.navigate('MainTabs', { screen: 'History' });
     };
 
     return (
@@ -211,7 +211,7 @@ const AddTransactionPage = ({ navigation }) => {
                 </View>
 
                 <TouchableOpacity style={styles.button} onPress={handleAddTransaction}>
-                    <Text style={styles.buttonText}>Add Transaction</Text>
+                    <Text style={styles.buttonText}>Submit</Text>
                 </TouchableOpacity>
             </View>
 
